@@ -6,8 +6,8 @@
   <title>Hydration Hero</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(to bottom, #0077cc, #88d8f7);
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(to bottom, #6dd5ed, #2193b0);
       color: white;
       text-align: center;
       margin: 0;
@@ -15,8 +15,8 @@
     }
     .container {
       max-width: 500px;
-      margin: 20px auto;
-      background: white;
+      margin: 30px auto;
+      background: rgba(255, 255, 255, 0.9);
       color: #333;
       padding: 20px;
       border-radius: 15px;
@@ -25,6 +25,12 @@
     h1 {
       margin: 20px 0;
       font-size: 2.5rem;
+      color: #2193b0;
+    }
+    p.tagline {
+      font-size: 1.2rem;
+      margin-bottom: 15px;
+      color: #555;
     }
     input {
       width: 80%;
@@ -38,26 +44,29 @@
       padding: 10px 20px;
       font-size: 16px;
       color: white;
-      background-color: #0077cc;
+      background-color: #2193b0;
       border: none;
       border-radius: 5px;
       cursor: pointer;
-      margin: 5px;
+      margin: 10px 0;
+      transition: all 0.3s;
     }
     button:hover {
-      background-color: #005fa3;
+      background-color: #176f88;
+      transform: scale(1.05);
     }
     .progress-container {
       margin: 20px 0;
     }
     .progress-bar {
-      background-color: #0077cc;
+      background-color: #2193b0;
       height: 25px;
       border-radius: 5px;
       text-align: center;
       color: white;
       font-size: 14px;
       line-height: 25px;
+      transition: width 0.5s ease;
     }
     .history {
       margin-top: 20px;
@@ -69,6 +78,7 @@
       margin: 5px 0;
       padding: 10px;
       border-radius: 5px;
+      color: #333;
     }
   </style>
   <script src="https://www.gstatic.com/firebasejs/9.10.0/firebase-app.js"></script>
@@ -76,16 +86,16 @@
 </head>
 <body>
   <h1>Hydration Hero</h1>
+  <p class="tagline">Track your hydration and reach your daily water goals. Let’s stay healthy!</p>
   <div class="container">
-    <p>Enter Username:</p>
-    <input type="text" id="usernameInput" placeholder="Enter your username">
-    <button onclick="loginUser()">Login</button>
+    <p>Start by entering your name:</p>
+    <input type="text" id="usernameInput" placeholder="Your name">
+    <button onclick="loginUser()">Start Tracking</button>
 
     <div id="mainApp" style="display: none;">
       <p>Welcome, <span id="usernameDisplay"></span>!</p>
-
-      <p>Set Your Daily Goal (oz):</p>
-      <input type="number" id="dailyGoalInput" placeholder="E.g., 64">
+      <p class="tagline">Set your daily hydration target:</p>
+      <input type="number" id="dailyGoalInput" placeholder="E.g., 64 oz">
       <button onclick="setDailyGoal()">Set Goal</button>
 
       <div class="progress-container">
@@ -95,14 +105,16 @@
         </div>
       </div>
 
-      <p>Log Your Water Intake (oz):</p>
-      <input type="number" id="waterInput" placeholder="E.g., 8">
+      <p>Log how much water you’ve consumed:</p>
+      <input type="number" id="waterInput" placeholder="E.g., 8 oz">
       <button onclick="logWater()">Log Water</button>
 
       <div id="totalDisplay" style="margin: 20px 0;">Total Water Intake: 0 oz</div>
 
+      <div id="feedback" style="color: green; margin: 10px 0;"></div>
+
       <div class="history">
-        <h3>History</h3>
+        <h3>Daily Log</h3>
         <div id="historyList"></div>
       </div>
 
@@ -111,7 +123,6 @@
   </div>
 
   <script>
-    // Your Firebase Configuration
     const firebaseConfig = {
       apiKey: "AIzaSyBV1Jdn73gMAtayITdzhzVgwGfUpNgSISk",
       authDomain: "hydration-hero.firebaseapp.com",
@@ -121,7 +132,6 @@
       appId: "1:877408590706:web:eab41248eec5e079731beb"
     };
 
-    // Initialize Firebase
     const app = firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
@@ -129,9 +139,8 @@
 
     function loginUser() {
       const username = document.getElementById('usernameInput').value.trim();
-
       if (!username) {
-        alert("Please enter a valid username!");
+        alert("Please enter a valid name!");
         return;
       }
 
@@ -144,43 +153,31 @@
       loadUserData();
     }
 
-    function logoutUser() {
-      currentUser = null;
-      document.getElementById('mainApp').style.display = 'none';
-      document.getElementById('usernameInput').style.display = 'block';
-      document.querySelector('button[onclick="loginUser()"]').style.display = 'inline';
-      document.getElementById('usernameInput').value = '';
-    }
-
     function setDailyGoal() {
-      const goalInput = document.getElementById('dailyGoalInput').value;
-      const goal = parseFloat(goalInput);
-
+      const goal = parseFloat(document.getElementById('dailyGoalInput').value);
       if (isNaN(goal) || goal <= 0) {
-        alert("Please enter a valid daily goal!");
+        alert("Please set a valid goal!");
         return;
       }
 
-      saveUserData({ dailyGoal: goal });
+      db.collection("users").doc(currentUser).set({ dailyGoal: goal }, { merge: true });
     }
 
     function logWater() {
-      const input = document.getElementById('waterInput').value;
-      const waterAmount = parseFloat(input);
-
-      if (isNaN(waterAmount) || waterAmount <= 0) {
-        alert("Please enter a valid amount!");
+      const input = parseFloat(document.getElementById('waterInput').value);
+      if (isNaN(input) || input <= 0) {
+        alert("Enter a valid amount!");
         return;
       }
 
       db.collection("users").doc(currentUser).update({
-        totalWater: firebase.firestore.FieldValue.increment(waterAmount),
-        history: firebase.firestore.FieldValue.arrayUnion(
-          `${new Date().toLocaleDateString()} - Logged ${waterAmount} oz`
-        )
+        totalWater: firebase.firestore.FieldValue.increment(input),
+        history: firebase.firestore.FieldValue.arrayUnion(`${new Date().toLocaleDateString()} - Logged ${input} oz`)
       }).then(() => {
         loadUserData();
         document.getElementById('waterInput').value = "";
+        document.getElementById('feedback').innerText = `Great job! You’re closer to your goal!`;
+        setTimeout(() => document.getElementById('feedback').innerText = "", 3000);
       });
     }
 
@@ -189,31 +186,27 @@
         if (doc.exists) {
           const data = doc.data();
           document.getElementById('totalDisplay').innerText = `Total Water Intake: ${data.totalWater || 0} oz`;
-
           const progress = Math.min((data.totalWater / data.dailyGoal) * 100, 100);
           document.getElementById('progressBar').style.width = progress + "%";
           document.getElementById('progressBar').innerText = Math.round(progress) + "%";
 
           const historyList = document.getElementById('historyList');
-          historyList.innerHTML = ''; // Clear history
+          historyList.innerHTML = '';
           (data.history || []).forEach(entry => {
-            const newEntry = document.createElement('div');
-            newEntry.className = 'history-item';
-            newEntry.innerText = entry;
-            historyList.appendChild(newEntry);
+            const div = document.createElement('div');
+            div.className = 'history-item';
+            div.innerText = entry;
+            historyList.appendChild(div);
           });
         } else {
-          db.collection("users").doc(currentUser).set({
-            totalWater: 0,
-            dailyGoal: 64,
-            history: []
-          }).then(loadUserData);
+          db.collection("users").doc(currentUser).set({ totalWater: 0, dailyGoal: 64, history: [] });
         }
       });
     }
 
-    function saveUserData(updates) {
-      db.collection("users").doc(currentUser).set(updates, { merge: true }).then(loadUserData);
+    function logoutUser() {
+      currentUser = null;
+      location.reload();
     }
   </script>
 </body>
