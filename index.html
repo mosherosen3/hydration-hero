@@ -71,6 +71,8 @@
       border-radius: 5px;
     }
   </style>
+  <script src="https://www.gstatic.com/firebasejs/9.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.10.0/firebase-firestore.js"></script>
 </head>
 <body>
   <h1>Hydration Hero</h1>
@@ -109,7 +111,20 @@
   </div>
 
   <script>
-    let usersData = JSON.parse(localStorage.getItem('usersData')) || {};
+    // Your Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyBV1Jdn73gMAtayITdzhzVgwGfUpNgSISk",
+      authDomain: "hydration-hero.firebaseapp.com",
+      projectId: "hydration-hero",
+      storageBucket: "hydration-hero.firebasestorage.app",
+      messagingSenderId: "877408590706",
+      appId: "1:877408590706:web:eab41248eec5e079731beb"
+    };
+
+    // Initialize Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
     let currentUser = null;
 
     function loginUser() {
@@ -118,16 +133,6 @@
       if (!username) {
         alert("Please enter a valid username!");
         return;
-      }
-
-      // Load or initialize user data
-      if (!usersData[username]) {
-        usersData[username] = {
-          totalWater: 0,
-          dailyGoal: 64,
-          history: []
-        };
-        saveData();
       }
 
       currentUser = username;
@@ -156,9 +161,7 @@
         return;
       }
 
-      usersData[currentUser].dailyGoal = goal;
-      saveData();
-      updateUI();
+      saveUserData({ dailyGoal: goal });
     }
 
     function logWater() {
@@ -170,45 +173,47 @@
         return;
       }
 
-      const userData = usersData[currentUser];
-      userData.totalWater += waterAmount;
-      userData.history.unshift(`${new Date().toLocaleDateString()} - Logged ${waterAmount} oz`);
-
-      saveData();
-      updateUI();
-
-      document.getElementById('waterInput').value = ""; // Clear input field
-    }
-
-    function loadUserData() {
-      const userData = usersData[currentUser];
-      document.getElementById('totalDisplay').innerText = `Total Water Intake: ${userData.totalWater} oz`;
-      updateHistory(userData.history);
-      updateUI();
-    }
-
-    function updateHistory(history) {
-      const historyList = document.getElementById('historyList');
-      historyList.innerHTML = ''; // Clear history
-      history.forEach(entry => {
-        const newEntry = document.createElement('div');
-        newEntry.className = 'history-item';
-        newEntry.innerText = entry;
-        historyList.appendChild(newEntry);
+      db.collection("users").doc(currentUser).update({
+        totalWater: firebase.firestore.FieldValue.increment(waterAmount),
+        history: firebase.firestore.FieldValue.arrayUnion(
+          `${new Date().toLocaleDateString()} - Logged ${waterAmount} oz`
+        )
+      }).then(() => {
+        loadUserData();
+        document.getElementById('waterInput').value = "";
       });
     }
 
-    function updateUI() {
-      const userData = usersData[currentUser];
-      const progressBar = document.getElementById('progressBar');
+    function loadUserData() {
+      db.collection("users").doc(currentUser).get().then(doc => {
+        if (doc.exists) {
+          const data = doc.data();
+          document.getElementById('totalDisplay').innerText = `Total Water Intake: ${data.totalWater || 0} oz`;
 
-      const progress = Math.min((userData.totalWater / userData.dailyGoal) * 100, 100);
-      progressBar.style.width = progress + "%";
-      progressBar.innerText = Math.round(progress) + "%";
+          const progress = Math.min((data.totalWater / data.dailyGoal) * 100, 100);
+          document.getElementById('progressBar').style.width = progress + "%";
+          document.getElementById('progressBar').innerText = Math.round(progress) + "%";
+
+          const historyList = document.getElementById('historyList');
+          historyList.innerHTML = ''; // Clear history
+          (data.history || []).forEach(entry => {
+            const newEntry = document.createElement('div');
+            newEntry.className = 'history-item';
+            newEntry.innerText = entry;
+            historyList.appendChild(newEntry);
+          });
+        } else {
+          db.collection("users").doc(currentUser).set({
+            totalWater: 0,
+            dailyGoal: 64,
+            history: []
+          }).then(loadUserData);
+        }
+      });
     }
 
-    function saveData() {
-      localStorage.setItem('usersData', JSON.stringify(usersData));
+    function saveUserData(updates) {
+      db.collection("users").doc(currentUser).set(updates, { merge: true }).then(loadUserData);
     }
   </script>
 </body>
