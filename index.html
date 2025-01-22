@@ -81,8 +81,125 @@
       color: #333;
     }
   </style>
-  <script src="https://www.gstatic.com/firebasejs/9.10.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.10.0/firebase-firestore.js"></script>
+  <script type="module">
+    // Import Firebase SDK
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-app.js";
+    import {
+      getFirestore,
+      doc,
+      setDoc,
+      getDoc,
+      updateDoc,
+      arrayUnion,
+      increment
+    } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-firestore.js";
+
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyBV1Jdn73gMAtayITdzhzVgwGfUpNgSISk",
+      authDomain: "hydration-hero.firebaseapp.com",
+      projectId: "hydration-hero",
+      storageBucket: "hydration-hero.firebasestorage.app",
+      messagingSenderId: "877408590706",
+      appId: "1:877408590706:web:eab41248eec5e079731beb"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Variables
+    let currentUser = null;
+
+    // Login User
+    async function loginUser() {
+      const username = document.getElementById('usernameInput').value.trim();
+      if (!username) {
+        alert("Please enter a valid name!");
+        return;
+      }
+
+      currentUser = username;
+      document.getElementById('usernameDisplay').innerText = username;
+      document.getElementById('mainApp').style.display = 'block';
+      document.getElementById('usernameInput').style.display = 'none';
+      document.querySelector('button[onclick="loginUser()"]').style.display = 'none';
+
+      await loadUserData();
+    }
+
+    // Load User Data
+    async function loadUserData() {
+      if (!currentUser) return;
+
+      const userRef = doc(db, "users", currentUser);
+
+      try {
+        const docSnap = await getDoc(userRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          document.getElementById('totalDisplay').innerText = `Total Water Intake: ${data.totalWater || 0} oz`;
+
+          const progress = Math.min((data.totalWater / data.dailyGoal) * 100, 100);
+          document.getElementById('progressBar').style.width = progress + "%";
+          document.getElementById('progressBar').innerText = Math.round(progress) + "%";
+
+          const historyList = document.getElementById('historyList');
+          historyList.innerHTML = '';
+          (data.history || []).forEach(entry => {
+            const div = document.createElement('div');
+            div.className = 'history-item';
+            div.innerText = entry;
+            historyList.appendChild(div);
+          });
+        } else {
+          await setDoc(userRef, { totalWater: 0, dailyGoal: 64, history: [] });
+        }
+      } catch (error) {
+        console.error("Error loading user data:", error);
+      }
+    }
+
+    // Set Daily Goal
+    async function setDailyGoal() {
+      const goal = parseFloat(document.getElementById('dailyGoalInput').value);
+      if (isNaN(goal) || goal <= 0) {
+        alert("Please set a valid goal!");
+        return;
+      }
+
+      const userRef = doc(db, "users", currentUser);
+      await setDoc(userRef, { dailyGoal: goal }, { merge: true });
+      await loadUserData();
+    }
+
+    // Log Water Intake
+    async function logWater() {
+      const input = parseFloat(document.getElementById('waterInput').value);
+      if (isNaN(input) || input <= 0) {
+        alert("Enter a valid amount!");
+        return;
+      }
+
+      const userRef = doc(db, "users", currentUser);
+      await updateDoc(userRef, {
+        totalWater: increment(input),
+        history: arrayUnion(`${new Date().toLocaleDateString()} - Logged ${input} oz`)
+      });
+
+      document.getElementById('waterInput').value = "";
+      document.getElementById('feedback').innerText = `Great job! You’re closer to your goal!`;
+      setTimeout(() => (document.getElementById('feedback').innerText = ""), 3000);
+
+      await loadUserData();
+    }
+
+    // Logout User
+    function logoutUser() {
+      currentUser = null;
+      location.reload();
+    }
+  </script>
 </head>
 <body>
   <h1>Hydration Hero</h1>
@@ -121,93 +238,5 @@
       <button onclick="logoutUser()" style="margin-top: 20px; background: red;">Logout</button>
     </div>
   </div>
-
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyBV1Jdn73gMAtayITdzhzVgwGfUpNgSISk",
-      authDomain: "hydration-hero.firebaseapp.com",
-      projectId: "hydration-hero",
-      storageBucket: "hydration-hero.firebasestorage.app",
-      messagingSenderId: "877408590706",
-      appId: "1:877408590706:web:eab41248eec5e079731beb"
-    };
-
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-
-    let currentUser = null;
-
-    function loginUser() {
-      const username = document.getElementById('usernameInput').value.trim();
-      if (!username) {
-        alert("Please enter a valid name!");
-        return;
-      }
-
-      currentUser = username;
-      document.getElementById('usernameDisplay').innerText = username;
-      document.getElementById('mainApp').style.display = 'block';
-      document.getElementById('usernameInput').style.display = 'none';
-      document.querySelector('button[onclick="loginUser()"]').style.display = 'none';
-
-      loadUserData();
-    }
-
-    function setDailyGoal() {
-      const goal = parseFloat(document.getElementById('dailyGoalInput').value);
-      if (isNaN(goal) || goal <= 0) {
-        alert("Please set a valid goal!");
-        return;
-      }
-
-      db.collection("users").doc(currentUser).set({ dailyGoal: goal }, { merge: true });
-    }
-
-    function logWater() {
-      const input = parseFloat(document.getElementById('waterInput').value);
-      if (isNaN(input) || input <= 0) {
-        alert("Enter a valid amount!");
-        return;
-      }
-
-      db.collection("users").doc(currentUser).update({
-        totalWater: firebase.firestore.FieldValue.increment(input),
-        history: firebase.firestore.FieldValue.arrayUnion(`${new Date().toLocaleDateString()} - Logged ${input} oz`)
-      }).then(() => {
-        loadUserData();
-        document.getElementById('waterInput').value = "";
-        document.getElementById('feedback').innerText = `Great job! You’re closer to your goal!`;
-        setTimeout(() => document.getElementById('feedback').innerText = "", 3000);
-      });
-    }
-
-    function loadUserData() {
-      db.collection("users").doc(currentUser).get().then(doc => {
-        if (doc.exists) {
-          const data = doc.data();
-          document.getElementById('totalDisplay').innerText = `Total Water Intake: ${data.totalWater || 0} oz`;
-          const progress = Math.min((data.totalWater / data.dailyGoal) * 100, 100);
-          document.getElementById('progressBar').style.width = progress + "%";
-          document.getElementById('progressBar').innerText = Math.round(progress) + "%";
-
-          const historyList = document.getElementById('historyList');
-          historyList.innerHTML = '';
-          (data.history || []).forEach(entry => {
-            const div = document.createElement('div');
-            div.className = 'history-item';
-            div.innerText = entry;
-            historyList.appendChild(div);
-          });
-        } else {
-          db.collection("users").doc(currentUser).set({ totalWater: 0, dailyGoal: 64, history: [] });
-        }
-      });
-    }
-
-    function logoutUser() {
-      currentUser = null;
-      location.reload();
-    }
-  </script>
 </body>
 </html>
