@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hydration Hero</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to bottom, #0077cc, #88d8f7);
+      color: white;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 500px;
+      margin: 20px auto;
+      background: white;
+      color: #333;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    h1 {
+      margin: 20px 0;
+      font-size: 2.5rem;
+    }
+    input {
+      width: 80%;
+      padding: 10px;
+      font-size: 16px;
+      margin: 10px 0;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      color: white;
+      background-color: #0077cc;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background-color: #005fa3;
+    }
+    .progress-container {
+      margin: 20px 0;
+    }
+    .progress-bar {
+      background-color: #0077cc;
+      height: 25px;
+      border-radius: 5px;
+      text-align: center;
+      color: white;
+      font-size: 14px;
+      line-height: 25px;
+    }
+    .history {
+      margin-top: 20px;
+      text-align: left;
+    }
+    .history-item {
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      margin: 5px 0;
+      padding: 10px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Hydration Hero</h1>
+  <div class="container">
+    <p>Enter Username:</p>
+    <input type="text" id="usernameInput" placeholder="Enter your username">
+    <button onclick="loginUser()">Login</button>
+
+    <div id="mainApp" style="display: none;">
+      <p>Welcome, <span id="usernameDisplay"></span>!</p>
+
+      <p>Set Your Daily Goal (oz):</p>
+      <input type="number" id="dailyGoalInput" placeholder="E.g., 64">
+      <button onclick="setDailyGoal()">Set Goal</button>
+
+      <div class="progress-container">
+        <p>Your Progress:</p>
+        <div style="background: #ddd; border-radius: 5px;">
+          <div id="progressBar" class="progress-bar" style="width: 0%;">0%</div>
+        </div>
+      </div>
+
+      <p>Log Your Water Intake (oz):</p>
+      <input type="number" id="waterInput" placeholder="E.g., 8">
+      <button onclick="logWater()">Log Water</button>
+
+      <div id="totalDisplay" style="margin: 20px 0;">Total Water Intake: 0 oz</div>
+
+      <div class="history">
+        <h3>History</h3>
+        <div id="historyList"></div>
+      </div>
+
+      <button onclick="logoutUser()" style="margin-top: 20px; background: red;">Logout</button>
+    </div>
+  </div>
+
+  <script>
+    let usersData = JSON.parse(localStorage.getItem('usersData')) || {};
+    let currentUser = null;
+
+    function loginUser() {
+      const username = document.getElementById('usernameInput').value.trim();
+
+      if (!username) {
+        alert("Please enter a valid username!");
+        return;
+      }
+
+      // Load or initialize user data
+      if (!usersData[username]) {
+        usersData[username] = {
+          totalWater: 0,
+          dailyGoal: 64,
+          history: []
+        };
+        saveData();
+      }
+
+      currentUser = username;
+      document.getElementById('usernameDisplay').innerText = username;
+      document.getElementById('mainApp').style.display = 'block';
+      document.getElementById('usernameInput').style.display = 'none';
+      document.querySelector('button[onclick="loginUser()"]').style.display = 'none';
+
+      loadUserData();
+    }
+
+    function logoutUser() {
+      currentUser = null;
+      document.getElementById('mainApp').style.display = 'none';
+      document.getElementById('usernameInput').style.display = 'block';
+      document.querySelector('button[onclick="loginUser()"]').style.display = 'inline';
+      document.getElementById('usernameInput').value = '';
+    }
+
+    function setDailyGoal() {
+      const goalInput = document.getElementById('dailyGoalInput').value;
+      const goal = parseFloat(goalInput);
+
+      if (isNaN(goal) || goal <= 0) {
+        alert("Please enter a valid daily goal!");
+        return;
+      }
+
+      usersData[currentUser].dailyGoal = goal;
+      saveData();
+      updateUI();
+    }
+
+    function logWater() {
+      const input = document.getElementById('waterInput').value;
+      const waterAmount = parseFloat(input);
+
+      if (isNaN(waterAmount) || waterAmount <= 0) {
+        alert("Please enter a valid amount!");
+        return;
+      }
+
+      const userData = usersData[currentUser];
+      userData.totalWater += waterAmount;
+      userData.history.unshift(`${new Date().toLocaleDateString()} - Logged ${waterAmount} oz`);
+
+      saveData();
+      updateUI();
+
+      document.getElementById('waterInput').value = ""; // Clear input field
+    }
+
+    function loadUserData() {
+      const userData = usersData[currentUser];
+      document.getElementById('totalDisplay').innerText = `Total Water Intake: ${userData.totalWater} oz`;
+      updateHistory(userData.history);
+      updateUI();
+    }
+
+    function updateHistory(history) {
+      const historyList = document.getElementById('historyList');
+      historyList.innerHTML = ''; // Clear history
+      history.forEach(entry => {
+        const newEntry = document.createElement('div');
+        newEntry.className = 'history-item';
+        newEntry.innerText = entry;
+        historyList.appendChild(newEntry);
+      });
+    }
+
+    function updateUI() {
+      const userData = usersData[currentUser];
+      const progressBar = document.getElementById('progressBar');
+
+      const progress = Math.min((userData.totalWater / userData.dailyGoal) * 100, 100);
+      progressBar.style.width = progress + "%";
+      progressBar.innerText = Math.round(progress) + "%";
+    }
+
+    function saveData() {
+      localStorage.setItem('usersData', JSON.stringify(usersData));
+    }
+  </script>
+</body>
+</html>
